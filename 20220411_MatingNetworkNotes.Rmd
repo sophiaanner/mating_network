@@ -1,0 +1,419 @@
+---
+title: "20220411_MatingNetworkBiostats_Anner"
+author: "Sophia Anner"
+date: "4/11/2022"
+output:
+  word_document: default
+  html_document: default
+---
+
+## 4-7-22
+
+```{r set up}
+library(tidyverse)
+library(igraph)
+```
+
+```{r load mating interactions dataset and process}
+rhag <- read.csv(file = "20220516_RhagMatingFixedDuplicates_intxns.csv", header = T)
+
+#take out the between sex trials
+rhag <- rhag %>% filter(within_sex == "N")
+
+#change the trial names to a factor, and then to a number so we have a new column (trial_number) that gives each trial a unique number ID 1 through 25
+str(rhag)
+rhag$trial_number <- as.numeric(as.factor(rhag$trial_name))
+
+#add M and F to actor and receiver codes so they have unique IDs
+rhag$actor_code <- paste0("M_", rhag$actor_code)
+rhag$receiver_code <- paste0("F_", rhag$receiver_code)
+head(rhag)
+
+#another way to do this
+#rhag <- rhag %>% unite(receiver_unique ID, "receiver_code", "receiver_sex", remove = F)
+#unite bring together two columns and remove = F keeps those columns
+```
+
+
+Visualize all networks as a bipartite network with a for loop
+```{r for loop to visualize all networks}
+par(mfrow=c(5,5))
+par(mar = c(1,1,1,1))
+for(i in 1:25){
+  sub <- rhag[rhag$trial_number == i,]
+  sub_graph <- rhag[rhag$trial_number == i,] %>% select(actor_code, receiver_code)
+  sub_graph <- as.matrix(sub_graph)
+  sub_graph <- graph_from_edgelist(sub_graph, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
+  set.seed(10)
+  plot.igraph(sub_graph, vertex.shape="square", vertex.size = 30, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(sub_graph)$weight*2, layout = layout.bipartite)
+}  
+
+#M on bottom, F on top
+```
+Let's look at just graph 11 for a bit
+```{r visualize just network 11}
+#select the trial we want
+  eleven <- rhag[rhag$trial_number == 11,]
+
+#choose the trial we want and only take the relevant columns
+  eleven_graph <- rhag[rhag$trial_number == 11,] %>% select(actor_code, receiver_code)
+  
+#make them a matrix
+  eleven_graph <- as.matrix(eleven_graph)
+  
+ #make a graph
+  eleven_graph <- graph_from_edgelist(eleven_graph, directed = T)
+
+#set the weight to be one
+  E(eleven_graph)$weight <- 1 
+  
+#set the weight to be larger if there are multiple interactions
+  eleven_graph <- simplify(eleven_graph, edge.attr.comb=list(weight="sum"))
+  
+#add a type so we can do a bipartite network, true if the name is in actor_code (i.e. male flies)
+  V(eleven_graph)$type <- V(eleven_graph)$name %in% eleven$actor_code
+  
+#set vertex color
+ # V(eleven_graph)$color <- c("steel blue")
+
+ #try to add host attribute
+#V(eleven_graph)$actor_host <- factor(eleven[match(V(eleven_graph)$name, eleven$actor_code), "actor_host"])
+#V(eleven_graph)$receiver_host <- factor(eleven[match(V(eleven_graph)$name, eleven$receiver_code), "receiver_host"])
+
+#V(eleven_graph)$color <- c("gold","slateblue")[(V(eleven_graph)$actor_host)]
+#V(eleven_graph)$color <- c("red","orange")[(V(eleven_graph)$receiver_host)]
+  
+#plot
+  #set.seed(10)
+  #plot.igraph(eleven_graph, vertex.shape="square", vertex.size = 30, edge.arrow.size = 0, 
+             # vertex.label.cex=0.6, edge.width = E(sub_graph)$weight*4, layout = layout.bipartite)
+  
+    plot.igraph(eleven_graph, vertex.shape="square", vertex.size = 30, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(eleven_graph)$weight*3, layout = layout.bipartite)
+```
+
+## 4-28-22
+
+Extract some metrics
+```{r extract some metrics (density and strength)}
+#initializae a vector to store results in the loop, otherwise it will just write it over
+densities <- rep(0, 25)
+strengths <- rep(0, 25)
+
+#use a for loop to calculate densities and strengths
+for(i in 1:25){
+  sub <- rhag[rhag$trial_number == i,]
+  sub_graph <- rhag[rhag$trial_number == i,] %>% select(actor_code, receiver_code)
+  sub_graph <- as.matrix(sub_graph)
+  sub_graph <- graph_from_edgelist(sub_graph, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
+  densities[[i]] <- edge_density(sub_graph)
+  #the ith value in our density vector we made earlier, put in the edge density for each network
+  strengths[[i]] <- mean(strength(sub_graph))
+}  
+
+#make a vector of trial names
+trial_names <- unique(rhag$trial_name)
+
+#make a vector of temperatures
+temp <- rep(c("control","warm"),times=c(10,15))
+
+#combine into a data frame
+global_summary <- data.frame(trial_names, temp, densities, strengths)
+
+#next steps, make a vector for the temperatures and cbind with the densities and strengths and make a little df of strengths, densities, and temp treatment and then run any kind of model on this 
+
+#strengths_ln <- t.test(df, etc etc)
+
+#think about what else I want to extract (summary stats at the network level), and add more to the for loop
+
+
+
+##Here's some measurements just for one graph
+
+#calculate edge density (number of edges/total possible edges
+density_11 <- edge_density(eleven_graph)
+
+#sum of edges connected to a note aka weighted degree
+strength_11 <- mean(strength(eleven_graph))
+```
+
+To do after meeting 4-28
+- add nodes without edges to dataset and plot
+- adjust density measure for bipartite nature
+- add attributes to notes
+- calculate assortativity 
+
+
+## 5-3-22
+
+### Attempting to join csvs
+*this was a plan to try to join the dataframes for those that mated and those that didn't, but in order to show all possible combinations in the network, we need to have all possible combinations in the df I think...*
+```{r attempt to join csvs, eval=FALSE}
+rhag
+rhag <- unite(rhag, unique_actor_ID, "trial_name", "actor_code", remove = F)
+rhag <- unite(rhag, unique_receiver_ID, "trial_name", "receiver_code", remove = F)
+
+#read in file
+rhag_all <- read.csv(file = "Lackey_RhagoletisMating_AllFlies.csv", header = T)
+rhag_all
+
+#male only
+rhag_all_M <- rhag_all %>%
+  filter(sex == "M")
+
+#add unique ID for M
+rhag_all_M <- unite(rhag_all_M, unique_actor_ID, "trial_name", "sex", "mark_code", remove = F)
+
+#add empty column for F
+rhag_all_M <- rhag_all_M %>% add_column(unique_receiver_ID = NA)
+
+#F only
+rhag_all_F <- rhag_all %>%
+  filter(sex == "F")
+
+#add unique ID for F
+rhag_all_F <- unite(rhag_all_F, unique_receiver_ID, "trial_name", "sex", "mark_code", remove = F)
+
+#add empty column for M
+rhag_all_F <- rhag_all_F %>% add_column(unique_actor_ID = NA)
+
+#combine M and F
+rhag_all_new <- rbind(rhag_all_F, rhag_all_M)
+#this on;y has 487 rows whereas the OG (rhag_all) has 489, but that's because there are two empty rows at the end.
+
+str(rhag)
+str(rhag_all_new)
+
+left_join(rhag, rhag_all_new, by = "unique_actor_ID", "unique_receiver_ID")
+#did not work as expected
+```
+
+### Notes for manually adding in non-mating pairs in excel
+
+* duplicate "Lackey_RhagoletisMating_NetworkAnalysis.csv" and rename "20220502_RhagMating_AllInteractions.csv"
+
+* next, I supposedly need to add in all possible interactions and just leave the data blank I think? this will be a lot. Approx 4755 or so...
+```{r}
+(2*(21*21) + 14*(20*20) + 4*(19*19) + 4*(18*18) + 1*(17*17))/2
+```
+
+* I might be able to use the expand() function in R. Need to troubleshoot this.
+
+## 5-4-22
+
+```{r trying expand function}
+x <- read.csv("20220502_RhagMating_AllInteractions.csv")
+head(x)
+
+x %>%
+  group_by(trial_name) %>%
+  expand(actor_code, receiver_code)
+
+#this is working technically, but it's only including all possible combinations of those that mated. This is because the edge list only includes those that have mated....
+
+
+#I am going to manually try to make all possible combos specifically for warming trial 01. **Note that I changed the female code that was GP to PG, in order to match the mating interactions code. Not sure why they are not the same!
+all_11 <- matrix(data = c("M_WB", "F_WY",
+                          "M_YR1", "F_CY1",
+                          "M_YR2", "F_CB",
+                          "M_Y", "F_CY2",
+                          "M_W", "F_WC",
+                          "M_GB", "F_R",
+                          "M_C", "F_CP",
+                          "M_B", "F_PG",
+                          "M_WG", "F_G",
+                          "M_YB", "F_CG",
+                          NA, "F_YG"), 
+                  nrow = 11, byrow = T)
+
+
+colnames(all_11) <- c("actor_code", "receiver_code")
+
+all_11 <- as.data.frame(all_11)
+
+expanded_11 <- all_11 %>%
+  expand(actor_code, receiver_code) %>%
+  drop_na()
+
+#Okay, so this worked for this one trial.
+
+expanded_11_joined <- expanded_11 %>%
+  full_join(eleven)
+#so this worked, but in the OG dataset there is a YR male who mated, but according to the "all flies" info, there are TWO YR males, and so I have labelled them differently, which is confusing. 
+
+```
+
+So, in the above chunk I manually made a list of the actor and receiver codes, and then joined it with the mating interactions for just warming trial 01 (trial # 11). If I can figure out how to coerce all flies into the format I want (two columns for M and F), then I might be able to write a for loop for this? It's just really hard to know where I may run into errors with duplicates, so doing it manually may unfortunately be the best way. **Note: the network figures only use actor code and receiver code as the input, which means if I put all the possible interactions in, it will assigned weight to each of these..... this may be a question for David.**
+
+```{r graph of 11 with all nodes}
+expanded_11_graph <- expanded_11_joined %>% select(actor_code, receiver_code)
+expanded_11_graph <- as.matrix(expanded_11_graph)
+expanded_11_graph <- graph_from_edgelist(expanded_11_graph, directed = T)
+E(expanded_11_graph)$weight <- 1 
+expanded_11_graph <- simplify(expanded_11_graph, edge.attr.comb=list(weight="sum"))
+V(expanded_11_graph)$type <- V(expanded_11_graph)$name %in% expanded_11_joined$actor_code
+
+
+plot.igraph(expanded_11_graph, vertex.shape="square", vertex.size = 30, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(expanded_11_graph)$weight*3, layout = layout.bipartite)
+
+
+#yeah, as expected it shows all possible combinations. It treats those that mated and those that didn't as identical, since there are only 2 columns.
+```
+
+One possibility for figuring this out would be to put in NAs for either actor code or receiver code, which could work?
+
+```{r adding NAs to full 11 dataset, eval=FALSE}
+all_11_NA <- matrix(data = c(NA, "F_WY",
+                          NA, "F_CY1",
+                          NA, "F_CB",
+                          NA, "F_CY2",
+                          NA, "F_WC",
+                          NA, "F_R",
+                          NA, "F_CP",
+                          NA, "F_GP",
+                          NA, "F_G",
+                          NA, "F_CG",
+                          NA, "F_YG",
+                          "M_WB", NA,
+                          "M_YR1", NA,
+                          "M_YR2", NA,
+                          "M_Y", NA,
+                          "M_W", NA,
+                          "M_GB", NA,
+                          "M_C", NA,
+                          "M_B", NA,
+                          "M_WG", NA,
+                          "M_YB", NA), 
+                  nrow = 21, byrow = T)
+
+
+colnames(all_11_NA) <- c("actor_code", "receiver_code")
+
+all_11_NA <- as.data.frame(all_11_NA)
+
+
+all_11_NA_joined <- all_11_NA %>%
+  full_join(eleven) %>% 
+  select(actor_code, receiver_code)
+
+all_11_NA_joined_graph <- as.matrix(all_11_NA_joined)
+all_11_NA_joined_graph <- graph_from_edgelist(all_11_NA_joined_graph)
+#it won't take NAs? great, back to the drawing board
+E(all_11_NA_joined_graph)$weight <- 1 
+all_11_NA_joined_graph <- simplify(all_11_NA_joined_graph, edge.attr.comb=list(weight="sum"))
+V(all_11_NA_joined_graph)$type <- V(all_11_NA_joined_graph)$name %in% all_11_NA_joined$actor_code
+```
+
+Okay new idea. Instead of joining the mated with all possible combinations, add them on top of each other and count multiple. Those that are 1 will be the unmated ones, and any more than 1 will be the mated ones.
+
+```{r}
+#this is all possible combinations
+expanded_11
+
+#and this is just the mated ones
+mated_11 <- eleven %>%
+  select(actor_code, receiver_code)
+
+#now to combine them
+b <- rbind(expanded_11, mated_11)
+#this now has duplicated for mating more than once
+
+b_graph <- as.matrix(b)
+b_graph <- graph_from_edgelist(b_graph, directed = T)
+E(b_graph)$weight <- 1 
+b_graph <- simplify(b_graph, edge.attr.comb=list(weight="sum"))
+V(b_graph)$type <- V(b_graph)$name %in% b$actor_code
+
+plot.igraph(b_graph, vertex.shape="circle", vertex.size = 30, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(b_graph)$weight-1, layout = layout.bipartite)
+```
+
+## 5-4-22 Meeting with DZ
+
+
+To use graph_from_data_frame igraph functions (graph_from_data_frame(d, directed = T/F, vertices = NULL/df)), either:
+* vertices is NULL, then the first two columns of d are an edge list and the additional columns are attributes
+* vertices is not NULL, then the first column of the vertices df vertex names and other columns are additional attributes
+```{r DZ does it better - add in all nodes and graph}
+rhag_nodes <- read.csv(file = "20220516_RhagMatingFixedDuplicates_allflies.csv", header = T)
+
+rhag_nodes <- unite(rhag_nodes, unique_ID, "sex", "mark_code", remove = F)
+
+rhag_nodes_ex <- rhag_nodes %>%
+  filter(trial_name == "HxA_C_04")
+
+rhag_edge_ex <- rhag %>%
+  filter(trial_name == "HxA_C_04")
+
+rhag_edge_ex <- rhag_edge_ex[,c(3, 6)]
+
+c <- graph_from_data_frame(d = rhag_edge_ex, vertices = rhag_nodes_ex$unique_ID, directed = T)
+E(c)$weight <- 1 
+c <- simplify(c, edge.attr.comb=list(weight="sum"))
+
+#V(c)$type <- ifelse(rhag_nodes_ex$sex == "F", TRUE, FALSE)
+#in order to get weird bipartite, switch what's commented out with the code below and then run the other code for the graph
+V(c)$type <- rhag_nodes_ex$sex
+
+V(c)$color <- ifelse(rhag_nodes_ex$sex == "F", "lightblue", "orange")
+
+V(c)$host <- ifelse(rhag_nodes_ex$host == "App", "circle", "square")
+
+
+#plot.igraph(c, vertex.shape="circle", vertex.size = 10, edge.arrow.size = 0.5, 
+ #             vertex.label.cex=0.6, edge.width = E(c)$weight*2, layout = layout.bipartite)
+
+plot.igraph(c, vertex.size = 20, edge.arrow.size = 0.5, 
+              vertex.label.cex=0.6, edge.width = E(c)$weight*2, vertex.shape = V(c)$host)
+
+```
+
+```{r attempt to put it all together in a for loop}
+par(mfrow=c(5,5))
+par(mar = c(1,1,1,1))
+for(i in 1:25){
+  sub <- rhag[rhag$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_code, receiver_code)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$color <- ifelse(sub_node$sex == "F", "lightblue", "orange")
+  V(sub_graph)$host <- ifelse(sub_node$host == "App", "circle", "square")
+  plot.igraph(sub_graph, vertex.shape=V(sub_graph)$host, vertex.size = 20, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(sub_graph)$weight*2, vertex.color = V(sub_graph)$color)
+}  
+```
+
+##5-16-22
+
+In order to troubleshoot the above code, I need to check each trial and check for errors. It works now!
+```{r}
+  sub <- rhag[rhag$trial_number == 25,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_code, receiver_code)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$color <- ifelse(sub_node$sex == "F", "lightblue", "orange")
+  V(sub_graph)$host <- ifelse(sub_node$host == "App", "circle", "square")
+  plot.igraph(sub_graph, vertex.shape=V(sub_graph)$host, vertex.size = 20, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(sub_graph)$weight*2, vertex.color = V(sub_graph)$color)
+```
+
+
+Current issues:
+- some of the codes in the edge list don't line up with the node list
+  - we can go through and check and toss options
+  - OR ask AL what's up and see if we can salvage something
+
+
+  
