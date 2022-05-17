@@ -208,7 +208,7 @@ left_join(rhag, rhag_all_new, by = "unique_actor_ID", "unique_receiver_ID")
 
 ## 5-4-22
 
-```{r trying expand function}
+```{r trying expand function, eval = F}
 x <- read.csv("20220502_RhagMating_AllInteractions.csv")
 head(x)
 
@@ -216,8 +216,7 @@ x %>%
   group_by(trial_name) %>%
   expand(actor_code, receiver_code)
 
-#this is working technically, but it's only including all possible combinations of those that mated. This is because the edge list only includes those that have mated....
-
+#this is working technically, but it's only including all possible combinations of those that mated. This is because the edge list only includes those that have mated.
 
 #I am going to manually try to make all possible combos specifically for warming trial 01. **Note that I changed the female code that was GP to PG, in order to match the mating interactions code. Not sure why they are not the same!
 all_11 <- matrix(data = c("M_WB", "F_WY",
@@ -252,7 +251,7 @@ expanded_11_joined <- expanded_11 %>%
 
 So, in the above chunk I manually made a list of the actor and receiver codes, and then joined it with the mating interactions for just warming trial 01 (trial # 11). If I can figure out how to coerce all flies into the format I want (two columns for M and F), then I might be able to write a for loop for this? It's just really hard to know where I may run into errors with duplicates, so doing it manually may unfortunately be the best way. **Note: the network figures only use actor code and receiver code as the input, which means if I put all the possible interactions in, it will assigned weight to each of these..... this may be a question for David.**
 
-```{r graph of 11 with all nodes}
+```{r graph of 11 with all nodes, eval = F}
 expanded_11_graph <- expanded_11_joined %>% select(actor_code, receiver_code)
 expanded_11_graph <- as.matrix(expanded_11_graph)
 expanded_11_graph <- graph_from_edgelist(expanded_11_graph, directed = T)
@@ -314,7 +313,7 @@ V(all_11_NA_joined_graph)$type <- V(all_11_NA_joined_graph)$name %in% all_11_NA_
 
 Okay new idea. Instead of joining the mated with all possible combinations, add them on top of each other and count multiple. Those that are 1 will be the unmated ones, and any more than 1 will be the mated ones.
 
-```{r}
+```{r, eval = F}
 #this is all possible combinations
 expanded_11
 
@@ -414,6 +413,10 @@ Current issues:
 - some of the codes in the edge list don't line up with the node list
   - we can go through and check and toss options
   - OR ask AL what's up and see if we can salvage something
+  
+## 5-17-22
+
+
 
 
   

@@ -1,0 +1,91 @@
+---
+title: "20220517_NetworkUpdates"
+author: "Sophia Anner"
+date: "5/17/2022"
+output: html_document
+---
+
+#Rhagoletis Mating Network Project Updates
+##Sophia Anner and David Zonana
+### This document serves as the most up to date work we have done to this code so far, in a "clean" version without other attemps at getting things to work. Eventually this could feasibly turn into our final code.
+
+```{r install packages}
+library(tidyverse)
+library(igraph)
+```
+
+
+```{r Load mating interactions data}
+rhag_edges <- read.csv(file = "20220516_RhagMatingFixedDuplicates_intxns.csv", header = T)
+
+#take out the between sex trials (there were so few and it wasn't the focus of this project, so they're not relevant to keep in)
+rhag_edges <- rhag_edges %>% filter(within_sex == "N")
+
+#change the trial names to a factor, and then to a number so we have a new column (trial_number) that gives each trial a unique number ID 1 through 25
+str(rhag_edges)
+rhag_edges$trial_number <- as.numeric(as.factor(rhag_edges$trial_name))
+
+#add M and F to actor and receiver codes so they have unique IDs
+rhag_edges <- rhag_edges %>% unite(receiver_uniqueID, "receiver_code", "receiver_sex", remove = F)
+rhag_edges <- rhag_edges %>% unite(actor_uniqueID, "actor_code", "actor_sex", remove = F)
+```
+
+
+```{r load data for all flies in trials}
+rhag_nodes <- read.csv(file = "20220516_RhagMatingFixedDuplicates_allflies.csv", header = T)
+
+#create a unique ID for each fly in each trial
+rhag_nodes <- unite(rhag_nodes, unique_ID, "mark_code", "sex", remove = F)
+```
+
+
+```{r visualize the interactions}
+par(mfrow=c(5,5))
+par(mar = c(1,1,1,1))
+for(i in 1:25){
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$color <- ifelse(sub_node$sex == "F", "lightblue", "orange")
+  V(sub_graph)$host <- ifelse(sub_node$host == "App", "circle", "square")
+  plot.igraph(sub_graph, vertex.shape=V(sub_graph)$host, vertex.size = 20, edge.arrow.size = 0.2, 
+              vertex.label.cex=0.6, edge.width = E(sub_graph)$weight*2, vertex.color = V(sub_graph)$color)
+} 
+```
+
+
+
+
+
+```{r extract density and strengths}
+#initialize a vector to store results in the loop, otherwise it will just write it over
+densities <- rep(0, 25)
+strengths <- rep(0, 25)
+
+#use a for loop to calculate densities and strengths
+for(i in 1:25){
+  sub <- rhag[rhag$trial_number == i,]
+  sub_graph <- rhag[rhag$trial_number == i,] %>% select(actor_code, receiver_code)
+  sub_graph <- as.matrix(sub_graph)
+  sub_graph <- graph_from_edgelist(sub_graph, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
+  densities[[i]] <- edge_density(sub_graph)
+  #the ith value in our density vector we made earlier, put in the edge density for each network
+  strengths[[i]] <- mean(strength(sub_graph))
+}  
+
+#make a vector of trial names
+trial_names <- unique(rhag$trial_name)
+
+#make a vector of temperatures
+temp <- rep(c("control","warm"),times=c(10,15))
+
+#combine into a data frame
+global_summary <- data.frame(trial_names, temp, densities, strengths)
+```
+
