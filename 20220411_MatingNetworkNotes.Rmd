@@ -416,7 +416,47 @@ Current issues:
   
 ## 5-17-22
 
+I made a new document to put all the clean, functional code in, and make a github repo. Confusingly, I did decide to change the "rhag" dataframe to "rhag_edges" so I knew what it was. This may cause some copy and paste issues down the line...
 
+I realize that to extract density and strength, we need a dataframe that includes all flies to calculate things properly. Then, I can try to visualize histograms of these metrics
 
+```{r}
+#initialize a vector to store results in the loop, otherwise it will just write it over
+densities <- rep(0, 25)
+strengths <- rep(0, 25)
+
+#use a for loop to calculate densities and strengths
+for(i in 1:25){
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+ # V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
+  densities[[i]] <- edge_density(sub_graph)
+  #the ith value in our density vector we made earlier, put in the edge density for each network
+  strengths[[i]] <- mean(strength(sub_graph))
+}  
+
+#make a vector of trial names
+trial_names <- unique(rhag$trial_name)
+
+#make a vector of temperatures
+temp <- rep(c("control","warm"),times=c(10,15))
+
+#combine into a data frame
+global_summary <- data.frame(trial_names, temp, densities, strengths)
+
+#visualize the distributions of density
+ggplot(global_summary, aes(x = trial_names, y = densities)) +
+  facet_wrap(~temp) +
+  geom_boxplot()
+
+#visualize the distributions of strength
+ggplot(global_summary, aes(x = strengths)) +
+  facet_wrap(~temp) +
+  geom_histogram()
+```
 
   

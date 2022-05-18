@@ -12,6 +12,7 @@ output: html_document
 ```{r install packages}
 library(tidyverse)
 library(igraph)
+library(ggplot2)
 ```
 
 
@@ -38,10 +39,13 @@ rhag_nodes <- read.csv(file = "20220516_RhagMatingFixedDuplicates_allflies.csv",
 rhag_nodes <- unite(rhag_nodes, unique_ID, "mark_code", "sex", remove = F)
 ```
 
+## Here, we have a full visualization of all 25 networks, but **we still need to find a way to make this bipartite instead of a circle.** 
+
+### The blue are females and the orange are males. The circles are apple flies, and the squares are hawthorn flies. 
 
 ```{r visualize the interactions}
 par(mfrow=c(5,5))
-par(mar = c(1,1,1,1))
+par(mar = c(0.5,0.5,0.5,0.5))
 for(i in 1:25){
   sub <- rhag_edges[rhag_edges$trial_number == i,]
   sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
@@ -51,13 +55,22 @@ for(i in 1:25){
   sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
   V(sub_graph)$color <- ifelse(sub_node$sex == "F", "lightblue", "orange")
   V(sub_graph)$host <- ifelse(sub_node$host == "App", "circle", "square")
-  plot.igraph(sub_graph, vertex.shape=V(sub_graph)$host, vertex.size = 20, edge.arrow.size = 0.2, 
-              vertex.label.cex=0.6, edge.width = E(sub_graph)$weight*2, vertex.color = V(sub_graph)$color)
+  plot.igraph(sub_graph, 
+              vertex.shape=V(sub_graph)$host, 
+              vertex.size = 20, 
+              edge.arrow.size = 0.2, 
+              vertex.label.cex = 0.5, 
+              edge.width = E(sub_graph)$weight*2, 
+              vertex.color = V(sub_graph)$color,
+              edge.color = "black")
 } 
 ```
 
 
+## We have also started to take a look at some network-wide metrics. 
 
+### *Density* = number of edges that exists divided by the total number of possible edges, so the number of matings our of all possible combinations of flies. 
+### *Strength* = sum of the interactions for each fly. At this level, it would be the average number of matings for each fly in the network. 
 
 
 ```{r extract density and strengths}
@@ -67,13 +80,13 @@ strengths <- rep(0, 25)
 
 #use a for loop to calculate densities and strengths
 for(i in 1:25){
-  sub <- rhag[rhag$trial_number == i,]
-  sub_graph <- rhag[rhag$trial_number == i,] %>% select(actor_code, receiver_code)
-  sub_graph <- as.matrix(sub_graph)
-  sub_graph <- graph_from_edgelist(sub_graph, directed = T)
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
   E(sub_graph)$weight <- 1
   sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
-  V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
+ # V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
   densities[[i]] <- edge_density(sub_graph)
   #the ith value in our density vector we made earlier, put in the edge density for each network
   strengths[[i]] <- mean(strength(sub_graph))
@@ -87,5 +100,6 @@ temp <- rep(c("control","warm"),times=c(10,15))
 
 #combine into a data frame
 global_summary <- data.frame(trial_names, temp, densities, strengths)
+
 ```
 
