@@ -5,6 +5,8 @@ date: "4/11/2022"
 output:
   word_document: default
   html_document: default
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ## 4-7-22
@@ -559,10 +561,79 @@ for(i in 1:25){
 
 ```
 
+## 5-26-22
 
+We should be able to plot as bipartite if we add sex as "type" attribute
 
+```{r}
+par(mfrow=c(5,5))
+par(mar = c(0.5,0.5,0.5,0.5))
+for(i in 1:25){
+#  layout = layout_as_bipartite(sub_graph, hgap =)
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$sex <- sub_node$sex
+  V(sub_graph)$host <- sub_node$host
+  V(sub_graph)$type <- as.logical(ifelse(sub_node$sex == "F", T, F))
+  plot.igraph(sub_graph, 
+              vertex.shape=c( "circle", "square")[1+(V(sub_graph)$sex=="M")], 
+              vertex.size = 20, 
+              edge.arrow.size = 0.2, 
+              vertex.label.cex = 0.5, 
+              edge.width = E(sub_graph)$weight*2, 
+              vertex.color=c( "salmon", "lightgoldenrod1")[1+(V(sub_graph)$host=="App")],
+              edge.color = "black",
+              layout = layout_as_bipartite(sub_graph),
+              sub = sub_node$trial_name)
+} 
+```
 
+try assortment 
+```{r}
+library(assortnet)
+V(four_graph)$weight
+four_adj <- as_adjacency_matrix(four_graph, sparse = F, attr = "weight")
+assortment.discrete(four_adj, V(four_graph)$host, SE = T)
 
+four_adj_unweighted <- as_adjacency_matrix(four_graph, sparse = F)
+assortment.discrete(four_adj_unweighted, V(four_graph)$host)
+
+densities <- rep(0, 25)
+strengths <- rep(0, 25)
+assort <- rep(0, 25)
+
+for(i in 1:25){
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  sub_adj <- as_adjacency_matrix(sub_graph, sparse = F, attr = "weight")
+  V(sub_graph)$host <- sub_node$host
+  assort[[i]] <- assortment.discrete(sub_adj, V(sub_graph)$host)$r
+  densities[[i]] <- edge_density(sub_graph)
+  #the ith value in our density vector we made earlier, put in the edge density for each network
+  strengths[[i]] <- mean(strength(sub_graph))
+}  
+
+global_summary <- data.frame(trial_names, temp, densities, strengths, assort)
+
+ggplot(global_summary, aes(x = temp, y = assort)) +
+  geom_boxplot() +
+  geom_jitter()
+
+ggplot(global_summary, aes(x = densities, y = assort)) +
+  geom_jitter()
+
+t.test(global_summary[global_summary$temp == "control",]$assort, global_summary[global_summary$temp == "warm",]$assort)
+t.test(global_summary[global_summary$temp == "control",]$densities, global_summary[global_summary$temp == "warm",]$densities)
+t.test(global_summary[global_summary$temp == "control",]$strengths, global_summary[global_summary$temp == "warm",]$strengths)
+```
 
 
 
