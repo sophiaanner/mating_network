@@ -86,20 +86,20 @@ for(i in 1:25){
   sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
   E(sub_graph)$weight <- 1
   sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
- # V(sub_graph)$type <- V(sub_graph)$name %in% sub$actor_code
   densities[[i]] <- edge_density(sub_graph)
   #the ith value in our density vector we made earlier, put in the edge density for each network
   strengths[[i]] <- mean(strength(sub_graph))
 }  
 
 #make a vector of trial names
-trial_names <- unique(rhag$trial_name)
+trial_names <- unique(rhag_edges$trial_name)
 
 #make a vector of temperatures
 temp <- rep(c("control","warm"),times=c(10,15))
 
 #combine into a data frame
 global_summary <- data.frame(trial_names, temp, densities, strengths)
+
 
 ```
 
