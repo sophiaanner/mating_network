@@ -1,5 +1,5 @@
 ---
-title: "20220411_MatingNetworkBiostats_Anner"
+title: "20220411_MatingNetwork_Anner"
 author: "Sophia Anner"
 date: "4/11/2022"
 output:
@@ -9,11 +9,20 @@ editor_options:
   chunk_output_type: inline
 ---
 
+```{r}
+rm(list = ls())
+```
+
+
 ## 4-7-22
 
 ```{r set up}
 library(tidyverse)
 library(igraph)
+library(assortnet)
+library(ggplot2)
+library(bipartite)
+library(ggbipart)
 ```
 
 ```{r load mating interactions dataset and process}
@@ -427,7 +436,6 @@ I realize that to extract density and strength, we need a dataframe that include
 I am annoyed by how long thos document is now, so I am going to paste some code in to rewrite some of that stuff and keep it cleaner from here on out
 
 ```{r Load mating interactions data}
-rm(list = ls())
 
 rhag_edges <- read.csv(file = "20220516_RhagMatingFixedDuplicates_intxns.csv", header = T)
 
@@ -452,9 +460,10 @@ rhag_nodes <- unite(rhag_nodes, unique_ID, "mark_code", "sex", remove = F)
 ```
 
 
-```{r}
+```{r create four graph, calculate densities and strengths}
 #check density and strength for one trial
 
+#create four graph
 four <- rhag_edges[rhag_edges$trial_name == "HxA_C_04",]
 four_node <- rhag_nodes[rhag_nodes$trial_name == four$trial_name,]
 four <- four %>% select(actor_uniqueID, receiver_uniqueID)
@@ -462,7 +471,7 @@ four_graph <- graph_from_data_frame(d = four, vertices = four_node$unique_ID, di
 E(four_graph)$weight <- 1
 four_graph <- simplify(four_graph, edge.attr.comb=list(weight="sum"))
 four_density <- edge_density(four_graph)
-four_strength <- mean(strength(four_graph))
+four_strength <- mean(igraph::strength(four_graph))
   
   
 #initialize a vector to store results in the loop, otherwise it will just write it over
@@ -479,7 +488,7 @@ for(i in 1:25){
   sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
   densities[[i]] <- edge_density(sub_graph)
   #the ith value in our density vector we made earlier, put in the edge density for each network
-  strengths[[i]] <- mean(strength(sub_graph))
+  strengths[[i]] <- mean(igraph::strength(sub_graph))
 }  
 
 #make a vector of trial names
@@ -493,16 +502,18 @@ global_summary <- data.frame(trial_names, temp, densities, strengths)
 
 #quick visualization
 ggplot(global_summary, aes(x = temp, y = densities)) +
-  geom_boxplot()
+  geom_boxplot() + 
+  geom_jitter(width = .3)
 #warming treatment has fewer matings given the opportunity
 
 ggplot(global_summary, aes(x = temp, y = strengths)) +
-  geom_boxplot()
+  geom_boxplot() + 
+  geom_jitter(width = .3)
 #warming treatment has fewer mating on average (and a larger spread)
 ```
 
 Now I want to try to add attributes in
-```{r}
+```{r attempt to add attributes to visualization}
 l <- layout_on_grid(four_graph, width = 10)
 
 four <- rhag_edges[rhag_edges$trial_name == "HxA_C_04",]
@@ -565,7 +576,7 @@ for(i in 1:25){
 
 We should be able to plot as bipartite if we add sex as "type" attribute
 
-```{r}
+```{r plot all in bipartite form, with some errors}
 par(mfrow=c(5,5))
 par(mar = c(0.5,0.5,0.5,0.5))
 for(i in 1:25){
@@ -593,8 +604,8 @@ for(i in 1:25){
 ```
 
 try assortment 
-```{r}
-library(assortnet)
+```{r attempt assortment}
+
 V(four_graph)$weight
 four_adj <- as_adjacency_matrix(four_graph, sparse = F, attr = "weight")
 assortment.discrete(four_adj, V(four_graph)$host, SE = T)
@@ -625,7 +636,7 @@ global_summary <- data.frame(trial_names, temp, densities, strengths, assort)
 
 ggplot(global_summary, aes(x = temp, y = assort)) +
   geom_boxplot() +
-  geom_jitter()
+  geom_jitter(width = .3)
 
 ggplot(global_summary, aes(x = densities, y = assort)) +
   geom_jitter()
@@ -636,16 +647,193 @@ t.test(global_summary[global_summary$temp == "control",]$strengths, global_summa
 ```
 
 
+## 7-14-2022
 
 
 
+#trying to play around with the ggbipart package but not sure how to make it work?
+```{r trimming}
+#first, trim this down so it's M on one side and F on the other, as opposed to all flies on each side. this is the UNWEIGHTED version
+four_adj_unweighted_trim <- four_adj_unweighted[-c(1:10), 1:10]
+
+four_adj_trim <- four_adj[-c(1:10), 1:10]
+```
 
 
+MISC CODE
+
+four_graph
+as_adjacency_matrix(four_graph, sparse = F)
+E(four_graph)$weight <- 1
+four_graph <- simplify(four_graph, edge.attr.comb=list(weight="sum"))
+four_graph <- as_adjacency_matrix(four_graph, sparse = F, attr = "weight")
+
+bip= data.frame(P1= c(1, 12, 6, 0),
+                P2= c(1, 0, 4, 0),
+                P3= c(1, 7, 3, 12),
+     row.names= letters[1:4])
+col= c("A"= "grey80", "P"= "gold2")
 
 
+bip.net<- bip_init_network(as.matrix(four_adj)) 
+
+a<- bip_init_network(as.matrix(four_adj_unweighted_trim)) 
 
 
+bip_ggnet(a, as.matrix(four_adj_unweighted_trim), 
+         color= "mode", palette = col, 
+          edge.label = "weights",
+          label= TRUE)
 
+
+g <- sample_gnp(10, 2/10)
+as_adjacency_matrix(g)
+V(g)$name <- letters[1:vcount(g)]
+as_adjacency_matrix(g)
+E(g)$weight <- runif(ecount(g))
+as_adjacency_matrix(g, attr="weight")
+
+
+## 7-20-22
+
+Okay so things have been a little confusing since I am stealing variables from above, but "four_adj" should be the weighted network and "four_adj_unweighted" should be unweighted, as indicated in the name. In the code chunk above, I made the graph for the unweighted version, but I need to figure out how to weight it
+
+
+```{r attemp ggbipart}
+?bip_qtplot
+bip_qtplot(four_adj_trim)
+
+#BELOW is copied from the ggbipart website
+
+bip= data.frame(P1= c(1, 12, 6, 0),
+                P2= c(1, 0, 4, 0),
+                P3= c(1, 7, 3, 12),
+     row.names= letters[1:4])
+col= c("A"= "grey80", "P"= "gold2")
+bip.net<- bip_init_network(as.matrix(bip))
+
+col= c("P"= "#FC9272", "A"= "#9ECAE1")
+pp<- bip_ggnet(bip.net, as.matrix(bip),
+          size=7, shape= "mode", #label= T,
+          color= "mode", palette= col, 
+          layout.exp= 0.25) + 
+          geom_text(aes(label= network.vertex.names(bip.net)),
+                        color= "black", size= 3) 
+pp
+
+#Let me try to duplicate this
+four_adj_trim
+four_adj_trim_net<- bip_init_network(as.matrix(four_adj_trim))
+
+col= c("P"= "#FC9272", "A"= "#9ECAE1")
+pp<- bip_ggnet(four_adj_trim_net, as.matrix(four_adj_trim),
+          size=7, shape= "mode", label= T,
+          color= "mode", palette= col, 
+          layout.exp= 0.25) + 
+          geom_text(aes(label= network.vertex.names(four_adj_trim_net)),
+                        color= "black", size= 3) 
+pp
+#this doesn't work at all. not really sure why?
+```
+
+Trying out the bipartite package: https://cran.r-project.org/web/packages/bipartite/vignettes/Intro2bipartite.pdf
+```{r bupartite four manually}
+
+#examples from the PDF
+#par(xpd=T) 
+#plotweb(motten1982)
+#visweb(motten1982)
+
+#basic viz
+bip_railway(four_adj_trim, label = T)
+#but this doesn't include weights
+
+
+#trying it with my data
+#visweb(four_adj_trim, labsize = 0.5)
+
+#side by side comparison of weighted and unqeighted, showing only those that mated
+plotweb(four_adj_unweighted_trim)
+plotweb(four_adj_trim)
+
+#and including those that didn't mate
+plotweb(four_adj_unweighted_trim, empty = F)
+plotweb(four_adj_trim, empty = F)
+
+#setting the sequence for four_graph
+seq.high <- c("CR_F", "WG_F", "CY_F", "CB_F", "YR_F", "GB_F", "C_F", "GR_F", "R_F", "WY_F")
+seq.low <- c("R_M", "CG_M", "G_M", "B_M", "WC_M", "C_M", "WR_M", "CB_M", "YG_M", "YB_M")
+four_graph_seq <- list(c("CR_F", "WG_F", "CY_F", "CB_F", "YR_F", "GB_F", "C_F", "GR_F", "R_F", "WY_F"), c("R_M", "CG_M", "G_M", "B_M", "WC_M", "C_M", "WR_M", "CB_M", "YG_M", "YB_M"))
+names(four_graph_seq) <- c("seq.high", "seq.low")
+
+#plotting in correct order so there's no crosing ocer
+plotweb(four_adj_trim, 
+        empty = F,
+        sequence = four_graph_seq) #include those that didn't mate
+
+#I need to assign colors based on population, and make sure they are listed in the proper order. I'll start with matching existing sequences
+f_colors <- c("salmon", "salmon", "lightgoldenrod1", "lightgoldenrod1", "lightgoldenrod1", "salmon", "salmon", "lightgoldenrod1", "lightgoldenrod1", "salmon")
+
+#with F colors
+plotweb(four_adj_trim, 
+        empty = F,
+        sequence = four_graph_seq,
+        col.high = f_colors,
+        bor.col.high = f_colors)
+
+#now for males
+m_colors <- c("lightgoldenrod1", "salmon", "salmon", "lightgoldenrod1", "salmon", "lightgoldenrod1", "lightgoldenrod1", "lightgoldenrod1", "salmon", "salmon")
+
+plotweb(four_adj_trim, 
+        empty = F,
+        sequence = four_graph_seq,
+        col.high = f_colors,
+        bor.col.high = f_colors,
+        col.low = m_colors,
+        bor.col.low = m_colors)
+#yes!!! now, I need to reorder it to be split by populations. 
+
+#the sequence can be set manually, but the colors match what is listed in "four_adj_trim"
+four_graph_seq <- list(c("CR_F", "WG_F", "C_F", "GB_F", "WY_F", "CY_F", "CB_F", "YR_F", "GR_F", "R_F"), c("G_M", "CG_M", "WC_M", "YB_M", "YG_M", "B_M", "R_M", "C_M", "CB_M", "WR_M"))
+names(four_graph_seq) <- c("seq.high", "seq.low")
+#these colors are matching the order in four_adj_trim
+f_colors <- c(rep("salmon", 5), rep("lightgoldenrod1",5))
+m_colors <- c(rep("salmon", 5), rep("lightgoldenrod1",5))
+
+#Final plot for HxA_C_04
+plotweb(four_adj_trim, 
+        empty = F,
+        sequence = four_graph_seq,
+        col.high = f_colors,
+        bor.col.high = f_colors,
+        col.low = m_colors,
+        bor.col.low = m_colors, 
+        )
+
+```
+
+##7-21-22
+
+Let's see if I can do the plotting in a forloop...
+
+```{r}
+par(mfrow=c(5,5))
+par(mar = c(0.5,0.5,0.5,0.5))
+result <- vector("list", 25)
+for(i in 1:25){
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  sub_adj <- as_adjacency_matrix(sub_graph, sparse = F, attr = "weight")
+  sub_adj_trim <- sub_adj[-c(1:10), 1:10]
+  result[[i]] <- print(sub_adj_trim)
+} 
+
+#WORK IN PROGRESS. but I may need to manually trim those that are not 10 M and 10 F
+```
 
 
 
