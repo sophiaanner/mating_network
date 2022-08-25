@@ -577,7 +577,7 @@ for(i in 1:25){
 We should be able to plot as bipartite if we add sex as "type" attribute
 
 ```{r plot all in bipartite form, with some errors}
-par(mfrow=c(5,5))
+par(mfrow=c(1,25))
 par(mar = c(0.5,0.5,0.5,0.5))
 for(i in 1:25){
 #  layout = layout_as_bipartite(sub_graph, hgap =)
@@ -794,7 +794,7 @@ plotweb(four_adj_trim,
 #yes!!! now, I need to reorder it to be split by populations. 
 
 #the sequence can be set manually, but the colors match what is listed in "four_adj_trim"
-four_graph_seq <- list(c("CR_F", "WG_F", "C_F", "GB_F", "WY_F", "CY_F", "CB_F", "YR_F", "GR_F", "R_F"), c("G_M", "CG_M", "WC_M", "YB_M", "YG_M", "B_M", "R_M", "C_M", "CB_M", "WR_M"))
+four_graph_seq <- list(c("C_F", "CR_F", "WG_F", "GB_F", "WY_F", "CY_F", "CB_F", "YR_F", "GR_F", "R_F"), c("WC_M","CG_M", "G_M", "YB_M", "YG_M", "R_M", "B_M", "C_M", "CB_M", "WR_M"))
 names(four_graph_seq) <- c("seq.high", "seq.low")
 #these colors are matching the order in four_adj_trim
 f_colors <- c(rep("salmon", 5), rep("lightgoldenrod1",5))
@@ -807,8 +807,8 @@ plotweb(four_adj_trim,
         col.high = f_colors,
         bor.col.high = f_colors,
         col.low = m_colors,
-        bor.col.low = m_colors, 
-        )
+        bor.col.low = m_colors)
+
 
 ```
 
@@ -828,12 +828,148 @@ for(i in 1:25){
   E(sub_graph)$weight <- 1
   sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
   sub_adj <- as_adjacency_matrix(sub_graph, sparse = F, attr = "weight")
-  sub_adj_trim <- sub_adj[-c(1:10), 1:10]
-  result[[i]] <- print(sub_adj_trim)
+  result[[i]] <- sub_adj
 } 
 
 #WORK IN PROGRESS. but I may need to manually trim those that are not 10 M and 10 F
+
+#I can use this to get to the weighted adjacency matrix, but I need to trim manually before plotting
 ```
+
+#7-22-22
+
+I'm going to manually craft all the plots
+
+Control trials
+```{r}
+#Trial 1: HxA_C_04, 10 M and 10 F
+C_04_adj <- result[[1]]
+C_04_adj_trim <- C_04_adj[-c(1:10), 1:10] #take out first 10 rows, keep first 10 columns
+
+#Trial 2: HxA_C_05, 10 M and 10 F
+C_05_adj <- result[[2]]
+C_05_adj_trim <- C_05_adj[-c(1:10), 1:10]
+
+#Trial 3: HxA_C_06, 8 M and 10 F
+C_06_adj <- result[[3]]
+C_06_adj_trim <- C_06_adj[c(1:8), -c(1:8)]
+
+#Trial 4: HxA_C_07, 10 M and 10 F
+C_07_adj <- result[[4]]
+C_07_adj_trim <- C_07_adj[1:10, -c(1:10)]
+
+#Trial 5: HxA_C_08, 9 F and 8 M
+C_08_adj <- result[[5]]
+C_08_adj_trim <- C_08_adj[-c(1:9), 1:9]
+
+#Trial 6: HxA_C_09, 10 M and 10 F
+C_09_adj <- result[[6]]
+C_09_adj_trim <- C_09_adj[-c(1:10), 1:10]
+
+#Trial 7: HxA_C_10, 10 M and 10 F
+C_10_adj <- result[[7]]
+C_10_adj_trim <- C_10_adj[-c(1:10), 1:10]
+
+#Trial 8: HxA_C_11, 10 F and 9 M
+C_11_adj <- result[[8]]
+C_11_adj_trim <- C_11_adj[-c(1:10), 1:10]
+
+#Trial 9: HxA_C_12, 10 F and 9 M
+C_12_adj <- result[[9]]
+C_12_adj_trim <- C_12_adj[-c(1:10), 1:10]
+
+#Trial 10: HxA_C_13, 10 F and 9 M
+C_13_adj <- result[[10]]
+C_13_adj_trim <- C_13_adj[-c(1:10), 1:10]
+```
+
+Trimming for warming trials
+```{r}
+#Trial 11: HxA_W_01, 10 M and 11 F
+W_01_adj <- result[[11]]
+W_01_adj_trim <- W_01_adj[1:10, -c(1:10)]
+
+#Trial 12: HxA_W_, 9 M and 9 F
+W_3_adj <- result[[12]]
+W_3_adj_trim <- W_3_adj[c(6:10, 15:18), c(1:5, 11:14)]
+
+#Trial 13: HxA_W_, 10 M and 10 F
+W_4_adj <- result[[13]]
+W_4_adj_trim <- W_4_adj[c(1:10), -c(1:10)]
+
+#Trial 14: HxA_W_, 9 M and 10 F
+W_6_adj <- result[[14]]
+W_6_adj_trim <- W_6_adj[c(1:9), -c(1:9)]
+
+#Trial 15: HxA_W_, 10 M and 11 F
+W_8_adj <- result[[15]]
+W_8_adj_trim <- W_8_adj[-c(1:11), 1:11]
+
+#Trial 16: HxA_W_, 10 M and 10 F
+W_9_adj <- result[[16]]
+W_9_adj_trim <- W_9_adj[-c(1:10), 1:10]
+
+#Trial 17: HxA_W_, 10 M and 10 F
+W_11_adj <- result[[17]]
+W_11_adj_trim <- W_11_adj[-c(1:10), 1:10]
+
+#Trial 18: HxA_W_, 10 M and 10 F
+W_12_adj <- result[[18]]
+W_12_adj_trim <- W_12_adj[c(1:10), -c(1:10)]
+
+#Trial 19: HxA_W_, 10 M and 10 F
+W_13_adj <- result[[19]]
+W_13_adj_trim <- W_13_adj[c(1:10), -c(1:10)]
+```
+
+Not yet run
+```{r}
+
+
+
+
+#Trial 20: HxA_W_, 10 M and 10 F
+W_14_adj <- result[[20]]
+W_14_adj_trim <- W_14_adj[-c(1:10), 1:10]
+
+#Trial 21: HxA_W_, 10 M and 10 F
+W_15_adj <- result[[21]]
+W_15_adj_trim <- W_15_adj[-c(1:10), 1:10]
+
+#Trial22 : HxA_W_, 10 M and 10 F
+W_16_adj <- result[[22]]
+W_16_adj_trim <- W_16_adj[-c(1:10), 1:10]
+
+#Trial 23: HxA_W_, 10 M and 10 F
+W_17_adj <- result[[23]]
+W_17_adj_trim <- W_17_adj[-c(1:10), 1:10]
+
+#Trial 24: HxA_W_, 10 M and 10 F
+W_18_adj <- result[[24]]
+W_18_adj_trim <- W_18_adj[-c(1:10), 1:10]
+
+#Trial 25: HxA_W_, 10 M and 10 F
+W_19_adj <- result[[25]]
+W_19_adj_trim <- W_19_adj[-c(1:10), 1:10]
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
