@@ -1,0 +1,200 @@
+---
+title: "20220517_NetworkUpdates"
+author: "Sophia Anner"
+date: "5/17/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+#Rhagoletis Mating Network Project Updates
+##Sophia Anner and David Zonana
+### This document serves as the most up to date work we have done to this code so far, in a "clean" version without other attemps at getting things to work. Eventually this could feasibly turn into our final code.
+
+```{r install packages}
+library(tidyverse)
+library(igraph)
+library(ggplot2)
+```
+
+
+```{r Load mating interactions data}
+rhag_edges <- read.csv(file = "20220516_RhagMatingFixedDuplicates_intxns.csv", header = T)
+
+#take out the between sex trials (there were so few and it wasn't the focus of this project, so they're not relevant to keep in)
+rhag_edges <- rhag_edges %>% filter(within_sex == "N")
+
+#change the trial names to a factor, and then to a number so we have a new column (trial_number) that gives each trial a unique number ID 1 through 25
+str(rhag_edges)
+rhag_edges$trial_number <- as.numeric(as.factor(rhag_edges$trial_name))
+
+#add M and F to actor and receiver codes so they have unique IDs
+rhag_edges <- rhag_edges %>% unite(receiver_uniqueID, "receiver_code", "receiver_sex", remove = F)
+rhag_edges <- rhag_edges %>% unite(actor_uniqueID, "actor_code", "actor_sex", remove = F)
+
+rhag_edges <- rhag_edges[,c(3,7,1,2,5,6,9,10,11,12,13,14,15,16)]
+```
+
+
+```{r load data for all flies in trials}
+rhag_nodes <- read.csv(file = "20220516_RhagMatingFixedDuplicates_allflies.csv", header = T)
+
+#create a unique ID for each fly in each trial
+rhag_nodes <- unite(rhag_nodes, unique_ID, "mark_code", "sex", remove = F)
+
+rhag_nodes <- rhag_nodes[,c(7,1,2,3,4,5,6,8,9,10,11,12)]
+```
+
+## Here, we have a full visualization of all 25 networks, but **we still need to find a way to make this bipartite instead of a circle.** 
+
+### The blue are females and the orange are males. The circles are apple flies, and the squares are hawthorn flies. 
+
+```{r visualize the interactions}
+incidence_mats <- list()
+igraph_nets <- list()
+
+# par(mfrow=c (5,5))
+# par(mar = c(0.5,0.5,0.5,0.5))
+for(i in 1:25){
+sub_edge <- rhag_edges[rhag_edges$trial_number == i,]
+sub_node <- rhag_nodes[rhag_nodes$trial_name %in% sub_edge$trial_name,]
+sub <- sub_edge %>% select(actor_uniqueID, receiver_uniqueID)
+sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+E(sub_graph)$weight <- 1
+sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+set_edge_attr(sub_graph, name = "successful_copulation", value = sub_edge$successful_copulation)
+V(sub_graph)$sex <- ifelse(sub_node$sex == "F", "circle", "square")
+V(sub_graph)$host <- ifelse(sub_node$host == "App","lightblue", "orange")
+V(sub_graph)$type <- as.logical(ifelse(sub_node$sex == "F", TRUE, FALSE))
+igraph_nets[[i]] <- sub_graph
+sub_incidence <- get.incidence(sub_graph, attr = "weight")
+incidence_mats[[i]] <- sub_incidence
+} 
+
+edge_attr(igraph_nets[[1]])
+
+for(i in 1:25){
+incidence_mats[[i]] <- sortweb(incidence_mats[[i]], sort.order="dec")
+}
+
+
+for(i in 1:25){
+  plotweb(incidence_mats[[i]], method="normal", empty = F,
+        col.high = V(igraph_nets[[1]])$host[match(colnames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)], 
+          col.low = V(igraph_nets[[1]])$host[match(rownames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)],
+  bor.col.high = V(igraph_nets[[1]])$host[match(colnames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)],
+  bor.col.low = V(igraph_nets[[1]])$host[match(rownames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)])
+}
+
+colnames(incidence_mats[[1]]) %in% V(igraph_nets[[1]])
+
+```
+
+```{try with bipartite}
+# install.packages("bipartite")
+library(bipartite)
+
+test <- cbind(get.edgelist(sub_graph, names = T), as.numeric(E(sub_graph)$weight)) %>% as.tibble() %>%
+  complete(V1 = sub_node[sub_node$sex == "M",]$unique_ID, V2 = sub_node[sub_node$sex == "F",]$unique_ID, fill = list(V3 = 0)) %>%
+  filter(V1 != V2)
+#test$V4 <- "trial"
+colnames(test) <- c("lower","higher","freq","webID")
+test <- test[,c("higher","lower","webID","freq")]
+
+g <- graph.data.frame(test, directed = F)
+V(g)$type <- V(g)$name %in% test$V2
+E(g)$weight <- as.numeric(test$V3)
+g
+
+test_incidence <- get.incidence(g, attr = "weight")
+
+# test2 <- frame2webs(test, varnames = c("higher","lower","webID","freq"), type.out = "array", emptylist = F)
+
+par(mar = c(1,1,1,1))
+plotweb(test_incidence, method = "normal", empty = F)
+plotmatrix(test_incidence)
+
+library(GGally)
+library(ggbipart)
+bip_net <- bip_init_network(test_incidence)
+p <- bip_ggnet(bip_net, as.matrix(test_incidence), color = "mode", layout.exp = 0)
+
+p +  geom_text(aes(label= network.vertex.names(bip_net)),
+                        color= "black", size= 3) +
+          theme(legend.position="none") 
+
+g <- bip_railway(test_incidence, label = T)
+
+g
+install.packages("bipartiteD3")
+
+
+
+
+```
+
+## We have also started to take a look at some network-wide metrics. 
+
+### *Density* = number of edges that exists divided by the total number of possible edges, so the number of matings our of all possible combinations of flies. 
+### *Strength* = sum of the interactions for each fly. At this level, it would be the average number of matings for each fly in the network. 
+
+
+```{r extract density and strengths}
+library(assortnet)
+#initialize a vector to store results in the loop, otherwise it will just write it over
+densities <- rep(0, 25)
+strengths <- rep(0, 25)
+strengths_sd <- rep(0,25)
+assort <- rep(0,25)
+assort2 <- rep(0,25)
+assort_poly <- rep(0,25)
+
+#use a for loop to calculate densities and strengths
+for(i in 1:25){
+  sub <- rhag_edges[rhag_edges$trial_number == i,]
+  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
+  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
+  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
+  E(sub_graph)$weight <- 1
+  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
+  V(sub_graph)$host <- ifelse(sub_node$host == "App","lightblue", "orange")
+  sub_graph$strength <- strength(sub_graph)
+  V(sub_graph)$strength <- sub_graph$strength
+  densities[[i]] <- edge_density(sub_graph)
+  #the ith value in our density vector we made earlier, put in the edge density for each network
+  strengths[[i]] <- mean(strength(sub_graph))
+  strengths_sd[[i]] <- sd(strength(sub_graph))
+  sub_adj <- as_adjacency_matrix(sub_graph,  attr = "weight", sparse = F)
+  assort[[i]] <- assortment.discrete(sub_adj, V(sub_graph)$host)$r
+  assort2[[i]] <- assortativity_nominal(sub_graph, as.integer(as.factor(V(sub_graph)$host)), directed = F)
+  assort_poly[[i]] <- assortment.discrete(sub_adj, V(sub_graph)$strength)$r
+}  
+
+#make a vector of trial names
+trial_names <- unique(rhag_edges$trial_name)
+
+#make a vector of temperatures
+temp <- rep(c("control","warm"),times=c(10,15))
+
+#combine into a data frame
+global_summary <- data.frame(trial_names, temp, densities, strengths, strengths_sd, assort, assort2, assort_poly)
+
+# ggplot(global_summary, aes(x = assort, y = assort2)) + geom_point()
+
+ggplot(global_summary, aes(x = temp, y = densities)) + geom_boxplot() + geom_jitter() + ylab("Densities") + theme_bw()
+t.test(global_summary[global_summary$temp == "control",]$densities, global_summary[global_summary$temp == "warm",]$densities)
+
+ggplot(global_summary, aes(x = temp, y = strengths)) + geom_boxplot() + geom_jitter() + ylab("Strength aka Weighted Degree") + theme_bw()
+t.test(global_summary[global_summary$temp == "control",]$strengths, global_summary[global_summary$temp == "warm",]$strengths)
+
+ggplot(global_summary, aes(x = temp, y = strengths_sd)) + geom_boxplot() + geom_jitter() + ylab("Strength SD") + theme_bw()
+t.test(global_summary[global_summary$temp == "control",]$strengths_sd, global_summary[global_summary$temp == "warm",]$strengths_sd)
+
+ggplot(global_summary, aes(x = temp, y = assort2)) + geom_boxplot() + geom_jitter() + ylab("Assortativity by Host") + theme_bw()
+t.test(global_summary[global_summary$temp == "control",]$assort2, global_summary[global_summary$temp == "warm",]$assort2)
+
+ggplot(global_summary, aes(x = temp, y = assort_poly)) + geom_boxplot() + geom_jitter() + ylab("Assortativity by # mating partners") + theme_bw()
+t.test(global_summary[global_summary$temp == "control",]$assort_poly, global_summary[global_summary$temp == "warm",]$assort_poly)
+
+```
+
