@@ -433,7 +433,7 @@ I realize that to extract density and strength, we need a dataframe that include
 
 ## 5-19-22
 
-I am annoyed by how long thos document is now, so I am going to paste some code in to rewrite some of that stuff and keep it cleaner from here on out
+I am annoyed by how long this document is now, so I am going to paste some code in to rewrite some of that stuff and keep it cleaner from here on out
 
 ```{r Load mating interactions data}
 
@@ -608,10 +608,10 @@ try assortment
 
 V(four_graph)$weight
 four_adj <- as_adjacency_matrix(four_graph, sparse = F, attr = "weight")
-assortment.discrete(four_adj, V(four_graph)$host, SE = T)
+#assortment.discrete(four_adj, V(four_graph)$host, SE = T)
 
 four_adj_unweighted <- as_adjacency_matrix(four_graph, sparse = F)
-assortment.discrete(four_adj_unweighted, V(four_graph)$host)
+#assortment.discrete(four_adj_unweighted, V(four_graph)$host)
 
 densities <- rep(0, 25)
 strengths <- rep(0, 25)
@@ -844,43 +844,64 @@ Control trials
 ```{r}
 #Trial 1: HxA_C_04, 10 M and 10 F
 C_04_adj <- result[[1]]
-C_04_adj_trim <- C_04_adj[-c(1:10), 1:10] #take out first 10 rows, keep first 10 columns
+C_04_adj_trim <- C_04_adj[-c(1:10), 1:10] #take out first 10 rows, keep first 10 columns'
+
+plotweb(C_04_adj_trim, empty = F)
 
 #Trial 2: HxA_C_05, 10 M and 10 F
 C_05_adj <- result[[2]]
 C_05_adj_trim <- C_05_adj[-c(1:10), 1:10]
 
+plotweb(C_05_adj_trim, empty = F)
+
 #Trial 3: HxA_C_06, 8 M and 10 F
 C_06_adj <- result[[3]]
 C_06_adj_trim <- C_06_adj[c(1:8), -c(1:8)]
+
+plotweb(C_06_adj_trim, empty = F)
 
 #Trial 4: HxA_C_07, 10 M and 10 F
 C_07_adj <- result[[4]]
 C_07_adj_trim <- C_07_adj[1:10, -c(1:10)]
 
+plotweb(C_07_adj_trim, empty = F)
+
 #Trial 5: HxA_C_08, 9 F and 8 M
 C_08_adj <- result[[5]]
 C_08_adj_trim <- C_08_adj[-c(1:9), 1:9]
+
+plotweb(C_08_adj_trim, empty = F)
 
 #Trial 6: HxA_C_09, 10 M and 10 F
 C_09_adj <- result[[6]]
 C_09_adj_trim <- C_09_adj[-c(1:10), 1:10]
 
+plotweb(C_09_adj_trim, empty = F)
+
 #Trial 7: HxA_C_10, 10 M and 10 F
 C_10_adj <- result[[7]]
 C_10_adj_trim <- C_10_adj[-c(1:10), 1:10]
+
+plotweb(C_10_adj_trim, empty = F)
 
 #Trial 8: HxA_C_11, 10 F and 9 M
 C_11_adj <- result[[8]]
 C_11_adj_trim <- C_11_adj[-c(1:10), 1:10]
 
+plotweb(C_11_adj_trim, empty = F)
+
 #Trial 9: HxA_C_12, 10 F and 9 M
 C_12_adj <- result[[9]]
 C_12_adj_trim <- C_12_adj[-c(1:10), 1:10]
 
+plotweb(C_12_adj_trim, empty = F)
+
 #Trial 10: HxA_C_13, 10 F and 9 M
 C_13_adj <- result[[10]]
 C_13_adj_trim <- C_13_adj[-c(1:10), 1:10]
+
+
+#The issue with these plots is that the scale for the weightedness size changes based on the number of interactions in the network. 
 ```
 
 Trimming for warming trials
@@ -953,12 +974,32 @@ W_19_adj <- result[[25]]
 W_19_adj_trim <- W_19_adj[-c(1:10), 1:10]
 ```
 
+8-25-22
+
+I'm going to try to visualize the distribution of durations just out of curiousity
+```{r}
+ggplot(data = rhag_edges, aes(x = duration/60)) +
+  geom_histogram()
+```
+I'm going to try to make an edge list from the adjacency matrix that I trimmed
+```{r}
+C_04_adj_trim
+web2edges(C_04_adj_trim)
+#rows = "lower trophic species" (males in our data), columns = higher trophic sp (females in our data)
+
+C_04_igraph <- graph_from_adjacency_matrix(C_04_adj, weighted = T)
+C_04_adj_trim
+as_data_frame(C_04_igraph)
+as_edgelist(C_04_igraph, names = T)
+```
 
 
 
-
-
-
+playing around with plotweb
+```{r}
+plotweb(C_06_adj_trim, empty = F)
+plotweb(C_06_adj_trim, empty = F, method = "cca")
+```
 
 
 

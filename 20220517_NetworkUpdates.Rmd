@@ -88,8 +88,10 @@ for(i in 1:25){
   sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
   densities[[i]] <- edge_density(sub_graph)
   #the ith value in our density vector we made earlier, put in the edge density for each network
-  strengths[[i]] <- mean(strength(sub_graph))
+  strengths[[i]] <- mean(igraph::strength(sub_graph))
 }  
+
+#Note: I needed to add in igraph:: before strength because it does not work with if the bipartite package is loaded. it gives the error message x must be an array of at least two dimensions
 
 #make a vector of trial names
 trial_names <- unique(rhag_edges$trial_name)
