@@ -13,6 +13,7 @@ output: html_document
 library(tidyverse)
 library(igraph)
 library(ggplot2)
+library(bipartite)
 ```
 
 
@@ -29,6 +30,12 @@ rhag_edges$trial_number <- as.numeric(as.factor(rhag_edges$trial_name))
 #add M and F to actor and receiver codes so they have unique IDs
 rhag_edges <- rhag_edges %>% unite(receiver_uniqueID, "receiver_code", "receiver_sex", remove = F)
 rhag_edges <- rhag_edges %>% unite(actor_uniqueID, "actor_code", "actor_sex", remove = F)
+
+#create a new column for weight and fill it with ones
+rhag_edges$weight <- rep(1, nrow(rhag_edges))
+
+#reorder the edges so that actor and receiver are in the front. also, we removed columns we don't need.
+rhag_edges <- rhag_edges[,c("actor_uniqueID", "receiver_uniqueID", "within_pop", "successful_copulation", "trial_number", "trial_name", "duration", "weight")]
 ```
 
 
@@ -39,31 +46,41 @@ rhag_nodes <- read.csv(file = "20220516_RhagMatingFixedDuplicates_allflies.csv",
 rhag_nodes <- unite(rhag_nodes, unique_ID, "mark_code", "sex", remove = F)
 ```
 
-## Here, we have a full visualization of all 25 networks, but **we still need to find a way to make this bipartite instead of a circle.** 
+## Here, we have a full visualization of all 25 networks using the plotweb() function in the bipartite package. 
 
-### The blue are females and the orange are males. The circles are apple flies, and the squares are hawthorn flies. 
+```{r Visualize the interactions}
+#create blank lists to put outputs into
+incidence_mats <- list()
+igraph_nets <- list()
 
-```{r visualize the interactions}
-par(mfrow=c(5,5))
-par(mar = c(0.5,0.5,0.5,0.5))
+#In this for loop, we first make igraph objects for each of the 25 trials. then, we add in edge attributes (weight and successful copulation) and node attributes (sex and host). Finally, we create incidence matrices for each igraph object, which is our matrix with females on one axis and males on the other. We will use the incidence matrices in the next for loop.
 for(i in 1:25){
-  sub <- rhag_edges[rhag_edges$trial_number == i,]
-  sub_node <- rhag_nodes[rhag_nodes$trial_name == sub$trial_name,]
-  sub <- sub %>% select(actor_uniqueID, receiver_uniqueID)
-  sub_graph <- graph_from_data_frame(d = sub, vertices = sub_node$unique_ID, directed = T)
-  E(sub_graph)$weight <- 1
-  sub_graph <- simplify(sub_graph, edge.attr.comb=list(weight="sum"))
-  V(sub_graph)$color <- ifelse(sub_node$sex == "F", "lightblue", "orange")
-  V(sub_graph)$host <- ifelse(sub_node$host == "App", "circle", "square")
-  plot.igraph(sub_graph, 
-              vertex.shape=V(sub_graph)$host, 
-              vertex.size = 20, 
-              edge.arrow.size = 0.2, 
-              vertex.label.cex = 0.5, 
-              edge.width = E(sub_graph)$weight*2, 
-              vertex.color = V(sub_graph)$color,
-              edge.color = "black")
+#make sub edge list for each trial number
+sub_edge <- rhag_edges[rhag_edges$trial_number == i,]
+sub_edge <- sub_edge %>% 
+  group_by(actor_uniqueID, receiver_uniqueID) %>% 
+  mutate(weight = sum(weight)) %>% 
+  unique()
+sub_node <- rhag_nodes[rhag_nodes$trial_name %in% sub_edge$trial_name,]
+sub_graph <- graph_from_data_frame(d = sub_edge, vertices = sub_node$unique_ID, directed = T)
+V(sub_graph)$host <- ifelse(sub_node$host == "App","lightgoldenrod1", "salmon")
+V(sub_graph)$type <- as.logical(ifelse(sub_node$sex == "F", TRUE, FALSE))
+igraph_nets[[i]] <- sub_graph
+sub_incidence <- get.incidence(sub_graph, attr = "weight")
+incidence_mats[[i]] <- sub_incidence
 } 
+
+
+#Next, we use the incidence matrices in the plotweb function to visualize our 25 networks. First, we sort them by decreasing row/column totals so the flies who didn't mate are grouped to the right. Then we set the color the nodes (and their borders) to match the host attribute, which was set in the first forloop.
+for(i in 1:25){
+  incidence_mats[[i]] <- sortweb(incidence_mats[[i]], sort.order="dec")
+  plotweb(incidence_mats[[i]], method="normal", empty = F,
+        col.high = V(igraph_nets[[1]])$host[match(colnames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)], 
+          col.low = V(igraph_nets[[1]])$host[match(rownames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)],
+  bor.col.high = V(igraph_nets[[1]])$host[match(colnames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)],
+  bor.col.low = V(igraph_nets[[1]])$host[match(rownames(incidence_mats[[1]]), V(igraph_nets[[1]])$name)])
+}
+
 ```
 
 
